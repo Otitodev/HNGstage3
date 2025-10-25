@@ -29,7 +29,7 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
 # Build DATABASE_URL from PostgreSQL components or fallback to SQLite
 if POSTGRES_PASSWORD:
-    DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}?sslmode=require"
 else:
     # Fallback to SQLite for development environments
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
@@ -97,7 +97,7 @@ class CountryOut(BaseModel):
     last_refreshed_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ErrorResponse(BaseModel):
     error: str
