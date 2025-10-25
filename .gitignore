@@ -194,3 +194,4 @@ logs/
 # Temporary files
 tmp/
 temp/
+.kiro/

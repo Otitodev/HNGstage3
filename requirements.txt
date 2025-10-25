@@ -1,9 +1,9 @@
- fastapi 
- uvicorn 
- sqlalchemy 
- pymysql 
- pydantic 
- requests 
- python-dotenv 
- pillow
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+requests
+python-dotenv
+pillow
 cryptography

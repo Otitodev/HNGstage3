@@ -20,7 +20,20 @@ from sqlalchemy.exc import SQLAlchemyError
 load_dotenv()
 
 # --- Config ---
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+# PostgreSQL configuration
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "country_cache")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+
+# Build DATABASE_URL from PostgreSQL components or fallback to SQLite
+if POSTGRES_PASSWORD:
+    DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+else:
+    # Fallback to SQLite for development environments
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 REFRESH_TIMEOUT = int(os.getenv("REFRESH_TIMEOUT_SECONDS", "20"))
@@ -29,7 +42,23 @@ RESTCOUNTRIES_URL = "https://restcountries.com/v2/all?fields=name,capital,region
 EXCHANGE_URL = "https://open.er-api.com/v6/latest/USD"
 
 # --- Database setup ---
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
+# PostgreSQL-optimized engine configuration
+if DATABASE_URL.startswith("postgresql"):
+    # PostgreSQL-specific optimizations
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        future=True,
+        pool_size=10,
+        max_overflow=20,
+        pool_timeout=30,
+        pool_recycle=3600,
+        echo=False
+    )
+else:
+    # SQLite configuration (fallback for development)
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 
