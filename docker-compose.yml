@@ -1,0 +1,26 @@
+version: "3.8"
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: country_cache
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:password@db:3306/country_cache
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+      - REFRESH_TIMEOUT_SECONDS=20
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+volumes:
+  db_data:
