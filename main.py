@@ -2,6 +2,7 @@
 import os
 import random
 import io
+import tempfile
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
@@ -10,7 +11,7 @@ from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont
 
 from fastapi import FastAPI, HTTPException, Query, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, validator
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, func
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -136,13 +137,12 @@ def get_meta(session, key: str) -> Optional[str]:
     return m.value if m else None
 
 # --- Image generation ---
-CACHE_DIR = "cache"
-SUMMARY_IMAGE_PATH = os.path.join(CACHE_DIR, "summary.png")
+# Store image data in memory instead of filesystem
+summary_image_data = None
 
 def generate_summary_image(session, last_refreshed_iso: str):
-    # Ensure cache dir exists
-    os.makedirs(CACHE_DIR, exist_ok=True)
-
+    global summary_image_data
+    
     # Get total and top 5 by estimated_gdp (non-null)
     total = session.query(func.count(Country.id)).scalar() or 0
     top5 = session.query(Country).filter(Country.estimated_gdp != None).order_by(Country.estimated_gdp.desc()).limit(5).all()
@@ -164,7 +164,11 @@ def generate_summary_image(session, last_refreshed_iso: str):
         draw.text((30, y), f"{idx}. {c.name} — {c.estimated_gdp:.2f}", font=font, fill=(0,0,0))
         y += 30
 
-    img.save(SUMMARY_IMAGE_PATH)
+    # Save to memory buffer instead of file
+    img_buffer = io.BytesIO()
+    img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    summary_image_data = img_buffer.getvalue()
 
 # --- Endpoint: POST /countries/refresh ---
 @app.post("/countries/refresh")
@@ -304,11 +308,15 @@ def list_countries(region: Optional[str] = Query(None), currency: Optional[str] 
 # --- GET /countries/image ---
 @app.get("/countries/image")
 def get_image():
-    # Use absolute path to ensure we find the file
-    abs_path = os.path.abspath(SUMMARY_IMAGE_PATH)
-    if not os.path.exists(abs_path):
-        return JSONResponse(status_code=404, content={"error": f"Summary image not found at {abs_path}"})
-    return FileResponse(abs_path, media_type="image/png")
+    global summary_image_data
+    if summary_image_data is None:
+        return JSONResponse(status_code=404, content={"error": "Summary image not found. Try refreshing countries first."})
+    
+    return StreamingResponse(
+        io.BytesIO(summary_image_data),
+        media_type="image/png",
+        headers={"Content-Disposition": "inline; filename=summary.png"}
+    )
 
 # --- GET /countries/{name} ---
 @app.get("/countries/{name}", response_model=CountryOut)
